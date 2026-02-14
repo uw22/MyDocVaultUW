@@ -5,7 +5,7 @@ import {
   Share2, Pencil, Save, ChevronLeft, ChevronRight, User, Shield, 
   Database, Info, LogOut, Moon, Bell, ChevronRight as ChevronIcon,
   Delete, AlertTriangle, KeyRound, Upload, FileJson, CheckCircle2,
-  RefreshCw, ShieldAlert, Smartphone, Laptop
+  RefreshCw, ShieldAlert, Smartphone, Laptop, File, ExternalLink
 } from 'lucide-react';
 import { Category, DocumentItem, DocType } from './types';
 import { CATEGORIES as INITIAL_CATEGORIES, INITIAL_DOCUMENTS, getDocIcon } from './constants';
@@ -117,6 +117,26 @@ const App: React.FC = () => {
     if (activeCategory === 'Alle') return documents;
     return documents.filter(doc => doc.category === activeCategory);
   }, [activeCategory, documents]);
+
+  // Helper to open PDF in a way that Android/iOS native viewers can handle
+  const openPdfNative = (doc: DocumentItem) => {
+    if (!doc.previewUrl) return;
+    
+    // If it's a data URI, we need to convert it to a Blob to be openable on mobile Chrome
+    if (doc.previewUrl.startsWith('data:application/pdf')) {
+      const base64 = doc.previewUrl.split(',')[1];
+      const bin = atob(base64);
+      const arr = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      const blob = new Blob([arr], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      // Cleanup URL after some time
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } else {
+      window.open(doc.previewUrl, '_blank');
+    }
+  };
 
   // Handle PIN input for all security flows
   const handleVaultAuthInput = (num: string) => {
@@ -352,7 +372,52 @@ const App: React.FC = () => {
       return <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} className="w-full h-full bg-[#0a0f18] p-4 text-white font-mono text-sm leading-relaxed outline-none resize-none border-none" spellCheck={false} />;
     }
     if ((doc.type === 'jpg' || doc.type === 'png') && doc.previewUrl) return <img src={doc.previewUrl} alt={doc.name} className="w-full h-full object-contain" />;
-    if (doc.type === 'pdf' && doc.previewUrl) return <iframe src={doc.previewUrl.startsWith('data:') ? doc.previewUrl : `${doc.previewUrl}#view=FitH&toolbar=0`} className="w-full h-full border-none bg-white rounded-lg" title={doc.name} />;
+    
+    if (doc.type === 'pdf' && doc.previewUrl) {
+      return (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-[#0d1523] rounded-lg">
+          {/* Object tag works better than iframe on some mobile browsers as it provides a clear fallback */}
+          <object 
+            data={doc.previewUrl} 
+            type="application/pdf" 
+            className="w-full h-full border-none bg-white rounded-lg hidden sm:block"
+          >
+            <div className="flex flex-col items-center justify-center p-8 text-center space-y-4">
+               <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center text-red-500">
+                  <File size={40} />
+               </div>
+               <div>
+                  <h4 className="font-bold text-slate-200">PDF Vorschau</h4>
+                  <p className="text-[10px] text-slate-500 mt-1 max-w-[200px]">Die Vorschau wird auf Ihrem Handy nicht direkt unterstützt.</p>
+               </div>
+               <button 
+                onClick={() => openPdfNative(doc)}
+                className="px-6 py-2.5 bg-blue-600 rounded-full text-white text-xs font-bold shadow-xl flex items-center gap-2"
+               >
+                 <ExternalLink size={14} /> Dokument öffnen
+               </button>
+            </div>
+          </object>
+          {/* Mobile direct view prompt */}
+          <div className="sm:hidden flex flex-col items-center justify-center p-8 text-center space-y-4">
+             <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center text-red-500">
+                <File size={40} />
+             </div>
+             <div>
+                <h4 className="font-bold text-slate-200">{doc.name}</h4>
+                <p className="text-[10px] text-slate-500 mt-1">Klicken Sie unten, um das Dokument in voller Größe zu betrachten.</p>
+             </div>
+             <button 
+              onClick={() => openPdfNative(doc)}
+              className="px-6 py-2.5 bg-blue-600 rounded-full text-white text-xs font-bold shadow-xl flex items-center gap-2"
+             >
+               <ExternalLink size={14} /> Dokument öffnen
+             </button>
+          </div>
+        </div>
+      );
+    }
+
     if (isTextType) return <div className="w-full h-full bg-[#0a0f18] p-4 overflow-y-auto text-slate-300 font-mono text-sm leading-relaxed select-text whitespace-pre-wrap">{doc.content || "Leer"}</div>;
     return <div className="text-sm text-slate-500 text-center">Keine Vorschau verfügbar</div>;
   };
@@ -520,26 +585,6 @@ const App: React.FC = () => {
         {activeTab === 'Settings' && (
           <main className="flex-1 overflow-y-auto p-4 pb-24 space-y-8">
             <h2 className="text-2xl font-bold">Optionen</h2>
-            
-            <section>
-              <h3 className="text-[10px] font-black uppercase text-slate-600 mb-3 tracking-widest">PWA Installation</h3>
-              <div className="bg-blue-600/10 border border-blue-500/20 rounded-2xl p-4 space-y-4">
-                <div className="flex items-start gap-3">
-                  <Smartphone className="text-blue-500 mt-1" size={20} />
-                  <div>
-                    <h4 className="text-xs font-bold text-blue-400 uppercase tracking-tighter">iOS / Android</h4>
-                    <p className="text-[10px] text-slate-400 leading-relaxed">Tippe auf das Teilen-Symbol (iOS) oder die 3 Punkte (Android) und wähle <b>"Zum Home-Bildschirm hinzufügen"</b>.</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Laptop className="text-blue-500 mt-1" size={20} />
-                  <div>
-                    <h4 className="text-xs font-bold text-blue-400 uppercase tracking-tighter">Desktop</h4>
-                    <p className="text-[10px] text-slate-400 leading-relaxed">Klicke rechts in der Adressleiste auf das <b>App-Symbol</b> zum Installieren.</p>
-                  </div>
-                </div>
-              </div>
-            </section>
 
             <section><h3 className="text-[10px] font-black uppercase text-slate-600 mb-3 tracking-widest">Erscheinungsbild</h3><div className="bg-slate-800/20 border border-slate-700/20 rounded-2xl overflow-hidden"><SettingsRow icon={<Moon size={18} className="text-blue-400" />} label="Dark Mode" toggle active={isDarkMode} onClick={() => setIsDarkMode(!isDarkMode)} /><SettingsRow icon={<Bell size={18} className="text-purple-400" />} label="Benachrichtigungen" toggle active={notificationsEnabled} onClick={() => setNotificationsEnabled(!notificationsEnabled)} /></div></section>
             <section><h3 className="text-[10px] font-black uppercase text-slate-600 mb-3 tracking-widest">Sicherheit</h3><div className="bg-slate-800/20 border border-slate-700/20 rounded-2xl overflow-hidden"><SettingsRow icon={<Lock size={18} className={appPin ? "text-blue-400" : "text-slate-600"} />} label="PIN Status" value={appPin ? "Aktiviert" : "Einrichten"} onClick={() => appPin ? setPinAction('remove') : setActiveTab('Tresor')} />{appPin && <SettingsRow icon={<KeyRound size={18} className="text-orange-400" />} label="PIN ändern" onClick={() => setPinAction('change_step1')} />}</div></section>
@@ -562,8 +607,30 @@ const App: React.FC = () => {
       {selectedDoc && (
         <div className="fixed inset-0 z-[100] bg-black flex flex-col animate-in slide-in-from-bottom">
             <header className="flex items-center justify-between p-4 bg-slate-900/98 border-b border-slate-800"><button onClick={() => { if (isDetailEditing) setIsDetailEditing(false); else setSelectedDoc(null); }} className="p-2 bg-slate-800 rounded-xl text-slate-400 hover:text-white"><X size={18} /></button><div className="flex flex-col items-center flex-1 px-4 truncate">{isDetailEditing ? <input value={editName} onChange={e => setEditName(e.target.value)} className="bg-[#0b121e] border border-slate-700 rounded-lg px-3 py-1.5 text-sm font-bold text-center w-full outline-none focus:ring-2 ring-blue-500" autoFocus /> : <><span className="text-sm font-black truncate w-full text-center">{selectedDoc.name}</span><span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{selectedDoc.category}</span></>}</div><div className="flex gap-2">{!isDetailEditing && <button onClick={() => setIsDetailEditing(true)} className="p-2 bg-blue-600/10 text-blue-500 rounded-xl hover:bg-blue-600/20"><Pencil size={18} /></button>}</div></header>
-            <div className="flex-1 p-4 bg-[#080c14] overflow-hidden flex flex-col"><div className={`flex-1 rounded-2xl overflow-hidden bg-[#111827] border border-slate-800 shadow-inner flex ${isCurrentDocText ? 'items-stretch' : 'items-center justify-center'}`}>{renderPreviewContent(selectedDoc)}</div>{isDetailEditing && <div className="mt-4 p-4 rounded-2xl bg-slate-900 border border-slate-800 animate-in slide-in-from-bottom-2"><label className="text-[10px] font-black uppercase text-slate-600 block mb-2">Kategorie</label><select value={editCategory} onChange={e => setEditCategory(e.target.value)} className="w-full bg-[#0b121e] border border-slate-700 rounded-xl px-4 py-3 text-sm font-bold text-slate-300">{folders.filter(f => f !== 'Alle').map(f => <option key={f} value={f}>{f}</option>)}<option value="Tresor">Tresor</option></select></div>}</div>
-            <footer className="p-4 pb-10 grid grid-cols-2 gap-3 bg-slate-900 border-t border-slate-800">{isDetailEditing ? (<><button onClick={() => setIsDetailEditing(false)} className="py-3.5 rounded-2xl bg-slate-800 font-bold text-sm text-slate-400">Abbrechen</button><button onClick={handleSaveEdit} className="py-3.5 rounded-2xl bg-blue-600 font-bold text-sm shadow-xl">Speichern</button></>) : (<><button onClick={() => handleDelete(selectedDoc.id)} className="py-3.5 rounded-2xl bg-red-600/10 text-red-500 font-bold text-sm hover:bg-red-600 hover:text-white transition-all">Löschen</button><a href={selectedDoc.previewUrl} download={selectedDoc.name} className="py-3.5 rounded-2xl bg-blue-600 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-xl hover:bg-blue-500"><Download size={16} /> Export</a></>)}</footer>
+            <div className="flex-1 p-4 bg-[#080c14] overflow-hidden flex flex-col">
+              <div className={`flex-1 rounded-2xl overflow-hidden bg-[#111827] border border-slate-800 shadow-inner flex ${isCurrentDocText ? 'items-stretch' : 'items-center justify-center'}`}>
+                {renderPreviewContent(selectedDoc)}
+              </div>
+              {isDetailEditing && <div className="mt-4 p-4 rounded-2xl bg-slate-900 border border-slate-800 animate-in slide-in-from-bottom-2"><label className="text-[10px] font-black uppercase text-slate-600 block mb-2">Kategorie</label><select value={editCategory} onChange={e => setEditCategory(e.target.value)} className="w-full bg-[#0b121e] border border-slate-700 rounded-xl px-4 py-3 text-sm font-bold text-slate-300">{folders.filter(f => f !== 'Alle').map(f => <option key={f} value={f}>{f}</option>)}<option value="Tresor">Tresor</option></select></div>}
+            </div>
+            <footer className="p-4 pb-10 grid grid-cols-2 gap-3 bg-slate-900 border-t border-slate-800">
+              {isDetailEditing ? (
+                <><button onClick={() => setIsDetailEditing(false)} className="py-3.5 rounded-2xl bg-slate-800 font-bold text-sm text-slate-400">Abbrechen</button><button onClick={handleSaveEdit} className="py-3.5 rounded-2xl bg-blue-600 font-bold text-sm shadow-xl">Speichern</button></>
+              ) : (
+                <>
+                  <button onClick={() => handleDelete(selectedDoc.id)} className="py-3.5 rounded-2xl bg-red-600/10 text-red-500 font-bold text-sm hover:bg-red-600 hover:text-white transition-all">Löschen</button>
+                  {selectedDoc.type === 'pdf' ? (
+                    <button onClick={() => openPdfNative(selectedDoc)} className="py-3.5 rounded-2xl bg-blue-600 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-xl hover:bg-blue-500">
+                      <ExternalLink size={16} /> Vollbild
+                    </button>
+                  ) : (
+                    <a href={selectedDoc.previewUrl} download={selectedDoc.name} className="py-3.5 rounded-2xl bg-blue-600 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-xl hover:bg-blue-500">
+                      <Download size={16} /> Export
+                    </a>
+                  )}
+                </>
+              )}
+            </footer>
         </div>
       )}
 
