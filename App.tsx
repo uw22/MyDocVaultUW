@@ -5,7 +5,7 @@ import {
   Share2, Pencil, Save, ChevronLeft, ChevronRight, User, Shield, 
   Database, Info, LogOut, Moon, Bell, ChevronRight as ChevronIcon,
   Delete, AlertTriangle, KeyRound, Upload, FileJson, CheckCircle2,
-  RefreshCw, ShieldAlert
+  RefreshCw, ShieldAlert, Smartphone, Laptop
 } from 'lucide-react';
 import { Category, DocumentItem, DocType } from './types';
 import { CATEGORIES as INITIAL_CATEGORIES, INITIAL_DOCUMENTS, getDocIcon } from './constants';
@@ -520,6 +520,27 @@ const App: React.FC = () => {
         {activeTab === 'Settings' && (
           <main className="flex-1 overflow-y-auto p-4 pb-24 space-y-8">
             <h2 className="text-2xl font-bold">Optionen</h2>
+            
+            <section>
+              <h3 className="text-[10px] font-black uppercase text-slate-600 mb-3 tracking-widest">PWA Installation</h3>
+              <div className="bg-blue-600/10 border border-blue-500/20 rounded-2xl p-4 space-y-4">
+                <div className="flex items-start gap-3">
+                  <Smartphone className="text-blue-500 mt-1" size={20} />
+                  <div>
+                    <h4 className="text-xs font-bold text-blue-400 uppercase tracking-tighter">iOS / Android</h4>
+                    <p className="text-[10px] text-slate-400 leading-relaxed">Tippe auf das Teilen-Symbol (iOS) oder die 3 Punkte (Android) und wähle <b>"Zum Home-Bildschirm hinzufügen"</b>.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Laptop className="text-blue-500 mt-1" size={20} />
+                  <div>
+                    <h4 className="text-xs font-bold text-blue-400 uppercase tracking-tighter">Desktop</h4>
+                    <p className="text-[10px] text-slate-400 leading-relaxed">Klicke rechts in der Adressleiste auf das <b>App-Symbol</b> zum Installieren.</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
             <section><h3 className="text-[10px] font-black uppercase text-slate-600 mb-3 tracking-widest">Erscheinungsbild</h3><div className="bg-slate-800/20 border border-slate-700/20 rounded-2xl overflow-hidden"><SettingsRow icon={<Moon size={18} className="text-blue-400" />} label="Dark Mode" toggle active={isDarkMode} onClick={() => setIsDarkMode(!isDarkMode)} /><SettingsRow icon={<Bell size={18} className="text-purple-400" />} label="Benachrichtigungen" toggle active={notificationsEnabled} onClick={() => setNotificationsEnabled(!notificationsEnabled)} /></div></section>
             <section><h3 className="text-[10px] font-black uppercase text-slate-600 mb-3 tracking-widest">Sicherheit</h3><div className="bg-slate-800/20 border border-slate-700/20 rounded-2xl overflow-hidden"><SettingsRow icon={<Lock size={18} className={appPin ? "text-blue-400" : "text-slate-600"} />} label="PIN Status" value={appPin ? "Aktiviert" : "Einrichten"} onClick={() => appPin ? setPinAction('remove') : setActiveTab('Tresor')} />{appPin && <SettingsRow icon={<KeyRound size={18} className="text-orange-400" />} label="PIN ändern" onClick={() => setPinAction('change_step1')} />}</div></section>
             <section><h3 className="text-[10px] font-black uppercase text-slate-600 mb-3 tracking-widest">Daten</h3><div className="bg-slate-800/20 border border-slate-700/20 rounded-2xl overflow-hidden"><SettingsRow icon={<Download size={18} className="text-blue-400" />} label="Export" onClick={handleExportBackup} /><SettingsRow icon={<Upload size={18} className="text-green-400" />} label="Backup einspielen" onClick={() => backupInputRef.current?.click()} /><SettingsRow icon={<Database size={18} className="text-slate-400" />} label="Cache leeren" onClick={clearCache} /></div></section>
