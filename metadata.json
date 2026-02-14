@@ -1,0 +1,7 @@
+{
+  "name": "DocVault Pro",
+  "description": "A sophisticated document management interface with a dark theme, category filtering, and intelligent document insights.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
