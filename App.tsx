@@ -32,19 +32,26 @@ const App: React.FC = () => {
   // --- Persistence Logic ---
   const [appPin, setAppPin] = useState<string | null>(() => localStorage.getItem('docvault_app_pin'));
   
+  // Use a "initialized" flag to know if we should load defaults or stay empty
+  const [isInitialized, setIsInitialized] = useState(() => localStorage.getItem('docvault_initialized') === 'true');
+
   const [documents, setDocuments] = useState<DocumentItem[]>(() => {
     const saved = localStorage.getItem('docvault_docs');
-    return saved ? JSON.parse(saved) : INITIAL_DOCUMENTS;
+    if (saved) return JSON.parse(saved);
+    // Only return initial docs if we haven't been initialized as empty before
+    return localStorage.getItem('docvault_initialized') === 'true' ? [] : INITIAL_DOCUMENTS;
   });
 
   const [vaultDocs, setVaultDocs] = useState<DocumentItem[]>(() => {
     const saved = localStorage.getItem('docvault_vault_docs');
-    return saved ? JSON.parse(saved) : INITIAL_SECURE_DOCUMENTS;
+    if (saved) return JSON.parse(saved);
+    return localStorage.getItem('docvault_initialized') === 'true' ? [] : INITIAL_SECURE_DOCUMENTS;
   });
 
   const [folders, setFolders] = useState<string[]>(() => {
     const saved = localStorage.getItem('docvault_folders');
-    return saved ? JSON.parse(saved) : INITIAL_CATEGORIES;
+    if (saved) return JSON.parse(saved);
+    return INITIAL_CATEGORIES;
   });
 
   // Settings states
@@ -54,7 +61,12 @@ const App: React.FC = () => {
   // Sync state to localStorage
   useEffect(() => {
     localStorage.setItem('docvault_docs', JSON.stringify(documents));
-  }, [documents]);
+    // Once any change happens, mark as initialized
+    if (!isInitialized && (documents.length > 0 || vaultDocs.length > 0)) {
+      localStorage.setItem('docvault_initialized', 'true');
+      setIsInitialized(true);
+    }
+  }, [documents, vaultDocs, isInitialized]);
 
   useEffect(() => {
     localStorage.setItem('docvault_vault_docs', JSON.stringify(vaultDocs));
@@ -122,7 +134,6 @@ const App: React.FC = () => {
   const openPdfNative = (doc: DocumentItem) => {
     if (!doc.previewUrl) return;
     
-    // If it's a data URI, we need to convert it to a Blob to be openable on mobile Chrome
     if (doc.previewUrl.startsWith('data:application/pdf')) {
       const base64 = doc.previewUrl.split(',')[1];
       const bin = atob(base64);
@@ -131,7 +142,6 @@ const App: React.FC = () => {
       const blob = new Blob([arr], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
-      // Cleanup URL after some time
       setTimeout(() => URL.revokeObjectURL(url), 10000);
     } else {
       window.open(doc.previewUrl, '_blank');
@@ -352,12 +362,35 @@ const App: React.FC = () => {
     setDocuments(json.documents); setVaultDocs(json.vaultDocs); setFolders(json.folders); setAppPin(json.appPin || null);
     setRestoreConfirmation({ isOpen: false, data: null });
     setSelectedDoc(null); setIsEditMode(false); setActiveTab('Home');
+    localStorage.setItem('docvault_initialized', 'true');
+    setIsInitialized(true);
     triggerToast("Restore erfolgreich");
   };
 
-  const handleFactoryReset = () => {
+  // FIXED FACTORY RESET: Ensures state is cleared and doesn't reload demo data
+  const handleFactoryReset = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // 1. Clear State (this stops effects from re-saving old data)
+    setDocuments([]);
+    setVaultDocs([]);
+    setAppPin(null);
+    setFolders(INITIAL_CATEGORIES);
+    setIsInitialized(true);
+    setActiveTab('Home');
+    setIsFactoryResetModalOpen(false);
+
+    // 2. Clear LocalStorage and set "Initialized" so it starts empty next time
     localStorage.clear();
-    window.location.reload();
+    localStorage.setItem('docvault_initialized', 'true');
+    
+    triggerToast("Alles gelöscht");
+    
+    // 3. Optional Reload with delay for visual feedback
+    setTimeout(() => {
+      window.location.reload();
+    }, 800);
   };
 
   const clearCache = () => {
@@ -376,7 +409,6 @@ const App: React.FC = () => {
     if (doc.type === 'pdf' && doc.previewUrl) {
       return (
         <div className="w-full h-full flex flex-col items-center justify-center bg-[#0d1523] rounded-lg">
-          {/* Object tag works better than iframe on some mobile browsers as it provides a clear fallback */}
           <object 
             data={doc.previewUrl} 
             type="application/pdf" 
@@ -398,7 +430,6 @@ const App: React.FC = () => {
                </button>
             </div>
           </object>
-          {/* Mobile direct view prompt */}
           <div className="sm:hidden flex flex-col items-center justify-center p-8 text-center space-y-4">
              <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center text-red-500">
                 <File size={40} />
@@ -589,7 +620,7 @@ const App: React.FC = () => {
             <section><h3 className="text-[10px] font-black uppercase text-slate-600 mb-3 tracking-widest">Erscheinungsbild</h3><div className="bg-slate-800/20 border border-slate-700/20 rounded-2xl overflow-hidden"><SettingsRow icon={<Moon size={18} className="text-blue-400" />} label="Dark Mode" toggle active={isDarkMode} onClick={() => setIsDarkMode(!isDarkMode)} /><SettingsRow icon={<Bell size={18} className="text-purple-400" />} label="Benachrichtigungen" toggle active={notificationsEnabled} onClick={() => setNotificationsEnabled(!notificationsEnabled)} /></div></section>
             <section><h3 className="text-[10px] font-black uppercase text-slate-600 mb-3 tracking-widest">Sicherheit</h3><div className="bg-slate-800/20 border border-slate-700/20 rounded-2xl overflow-hidden"><SettingsRow icon={<Lock size={18} className={appPin ? "text-blue-400" : "text-slate-600"} />} label="PIN Status" value={appPin ? "Aktiviert" : "Einrichten"} onClick={() => appPin ? setPinAction('remove') : setActiveTab('Tresor')} />{appPin && <SettingsRow icon={<KeyRound size={18} className="text-orange-400" />} label="PIN ändern" onClick={() => setPinAction('change_step1')} />}</div></section>
             <section><h3 className="text-[10px] font-black uppercase text-slate-600 mb-3 tracking-widest">Daten</h3><div className="bg-slate-800/20 border border-slate-700/20 rounded-2xl overflow-hidden"><SettingsRow icon={<Download size={18} className="text-blue-400" />} label="Export" onClick={handleExportBackup} /><SettingsRow icon={<Upload size={18} className="text-green-400" />} label="Backup einspielen" onClick={() => backupInputRef.current?.click()} /><SettingsRow icon={<Database size={18} className="text-slate-400" />} label="Cache leeren" onClick={clearCache} /></div></section>
-            <section><h3 className="text-[10px] font-black uppercase text-red-500 mb-3 tracking-widest">Gefahrenzone</h3><div className="bg-red-900/10 border border-red-500/20 rounded-2xl p-4 space-y-4"><button onClick={() => setIsFactoryResetModalOpen(true)} className="w-full py-3 rounded-xl bg-red-600 text-white font-bold text-sm shadow-xl">Alles löschen</button></div></section>
+            <section><h3 className="text-[10px] font-black uppercase text-red-500 mb-3 tracking-widest">Gefahrenzone</h3><div className="bg-red-900/10 border border-red-500/20 rounded-2xl p-4 space-y-4"><button onClick={() => setIsFactoryResetModalOpen(true)} className="w-full py-3 rounded-xl bg-red-600 text-white font-bold text-sm shadow-xl hover:bg-red-500 transition-colors">Alles löschen</button></div></section>
           </main>
         )}
       </div>
@@ -662,9 +693,9 @@ const App: React.FC = () => {
           <div className="w-full max-w-[320px] bg-[#1a2235] border border-red-500/30 rounded-3xl p-6 shadow-2xl">
             <div className="w-16 h-16 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4"><RefreshCw size={32} className="animate-spin" /></div>
             <h3 className="text-lg font-bold text-center mb-2 text-red-500">Vollständiger Reset?</h3>
-            <p className="text-xs text-slate-400 text-center mb-6 leading-relaxed">Sämtliche Dokumente und Daten werden unwiderruflich gelöscht. Nur empfohlen, wenn Sie den PIN vergessen haben.</p>
+            <p className="text-xs text-slate-400 text-center mb-6 leading-relaxed">Sämtliche Dokumente und Daten werden unwiderruflich gelöscht. Nur empfohlen, wenn Sie den PIN vergessen haben oder die App leeren möchten.</p>
             <div className="flex flex-col gap-2">
-              <button onClick={handleFactoryReset} className="w-full py-4 rounded-2xl bg-red-600 text-white font-bold text-sm shadow-xl">ALLES LÖSCHEN</button>
+              <button onClick={handleFactoryReset} className="w-full py-4 rounded-2xl bg-red-600 text-white font-bold text-sm shadow-xl active:bg-red-700">ALLES LÖSCHEN</button>
               <button onClick={() => setIsFactoryResetModalOpen(false)} className="w-full py-4 rounded-2xl bg-slate-800 text-slate-400 font-bold text-sm">Abbrechen</button>
             </div>
           </div>
